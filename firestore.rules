@@ -1,0 +1,72 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isParent(parentId) {
+      return isAuthenticated() && request.auth.uid == parentId;
+    }
+
+    // User profile documents
+    match /users/{userId} {
+      allow read, write: if isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Children profiles under parent account
+    match /children/{childId} {
+      allow read, write: if isAuthenticated() && (
+        resource == null || resource.data.parentId == request.auth.uid
+      );
+    }
+
+    // Enrolled devices
+    match /devices/{deviceId} {
+      // Parent can read and revoke their devices
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if isAuthenticated() && (
+        resource.data.parentId == request.auth.uid ||
+        request.resource.data.isRevoked != null
+      );
+    }
+
+    // Explicit Device Permissions
+    match /devicePermissions/{deviceId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // Parental Controls configuration
+    match /parentalControls/{childId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && resource.data.parentId == request.auth.uid;
+    }
+
+    // Screen time & usage metrics (Written by child device, read by parent)
+    match /screenTime/{statId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    match /appUsage/{usageId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // Emergency SOS Alerts (Always allowed to write by authenticated devices)
+    match /sosAlerts/{alertId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // Activity timeline events
+    match /activityLogs/{logId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // Parent to child messages
+    match /messages/{messageId} {
+      allow read, write: if isAuthenticated();
+    }
+  }
+}
